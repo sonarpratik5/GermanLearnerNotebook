@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>German Article Practice</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        .der { color: #000000; } /* Black for der/Der */
+        .die { color: #ff0000; } /* Red for die/Die */
+        .das { color: #0000ff; } /* Blue for das/Das */
+        #wordInput, #notesInput, #verbsInput { font-family: monospace; }
+        .output-word, .output-note, .output-verb { margin-bottom: 0.5rem; }
+
+        /* Set fixed heights for textareas */
+        #wordInput {
+            height: 260px; /* Matches combined height of notes and verbs + margins */
+        }
+
+        #notesInput, #verbsInput {
+            height: 120px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+    <div class="w-full max-w-4xl bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold text-center mb-6">German Notebook</h1>
+        
+        <!-- Input Form: Two Columns -->
+        <div class="flex flex-col md:flex-row gap-6 mb-6">
+            <!-- Left: Article Input -->
+            <div class="w-full md:w-1/2">
+                <h2 class="text-lg font-semibold mb-2">Add Vocabulary</h2>
+                <input type="text" id="title" placeholder="Enter title (e.g., Abendessen)" class="w-full p-2 mb-2 border rounded">
+                <textarea id="wordInput" placeholder="Enter words, one per line (e.g., der Apfel)" class="w-full p-2 mb-2 border rounded"></textarea>
+                <div id="previewContainer" class="mb-4"></div>
+            </div>
+            
+            <!-- Right: Notes and Verbs Input -->
+            <div class="w-full md:w-1/2">
+                <h2 class="text-lg font-semibold mb-2">Add Notes</h2>
+                <textarea id="notesInput" placeholder="Enter notes or phrases (e.g., Ich esse einen Apfel)" class="w-full p-2 mb-2 border rounded"></textarea>
+                <div id="notesPreview" class="mb-4"></div>
+                
+                <h2 class="text-lg font-semibold mb-2">Add Verbs</h2>
+                <textarea id="verbsInput" placeholder="Enter verbs, one per line (e.g., essen, trinken)" class="w-full p-2 mb-2 border rounded"></textarea>
+                <div id="verbsPreview" class="mb-4"></div>
+            </div>
+        </div>
+        
+        <!-- Add Button -->
+        <button id="addWords" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mb-6">Add Vocabulary, Notes, and Verbs</button>
+        
+        <!-- Vocabulary List -->
+        <div id="vocabList" class="mb-6">
+            <h2 class="text-lg font-semibold mb-2">Vocabulary List</h2>
+            <div id="wordContainer"></div>
+        </div>
+        
+        <!-- Save as PDF Button -->
+        <button id="savePDF" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Save as PDF</button>
+    </div>
+
+    <script>
+        let vocabulary = {};
+
+        $(document).ready(function() {
+            // Real-time color coding for words
+            $('#wordInput').on('input', function() {
+                const words = $(this).val().split('\n');
+                let coloredOutput = '';
+                
+                words.forEach(word => {
+                    word = word.trim();
+                    if (word) {
+                        const article = word.split(' ')[0];
+                        let className = '';
+                        if (['der', 'Der'].includes(article)) className = 'der';
+                        else if (['die', 'Die'].includes(article)) className = 'die';
+                        else if (['das', 'Das'].includes(article)) className = 'das';
+                        coloredOutput += `<div class="output-word ${className}">${word}</div>`;
+                    }
+                });
+
+                $('#previewContainer').html(coloredOutput);
+            });
+
+            // Real-time preview for notes
+            $('#notesInput').on('input', function() {
+                const notes = $(this).val().split('\n').filter(note => note.trim());
+                let output = notes.map(note => `<div class="output-note">${note}</div>`).join('');
+                $('#notesPreview').html(output);
+            });
+
+            // Real-time preview for verbs
+            $('#verbsInput').on('input', function() {
+                const verbs = $(this).val().split('\n').filter(verb => verb.trim());
+                let output = verbs.map(verb => `<div class="output-verb">${verb}</div>`).join('');
+                $('#verbsPreview').html(output);
+            });
+
+            // Add words, notes, and verbs to vocabulary
+            $('#addWords').click(function() {
+                const title = $('#title').val().trim();
+                const words = $('#wordInput').val().split('\n').map(word => word.trim()).filter(word => word);
+                const notes = $('#notesInput').val().split('\n').map(note => note.trim()).filter(note => note);
+                const verbs = $('#verbsInput').val().split('\n').map(verb => verb.trim()).filter(verb => verb);
+
+                // Validate words
+                if (words.length > 0) {
+                    const articles = ['der', 'die', 'das', 'Der', 'Die', 'Das'];
+                    for (const word of words) {
+                        const article = word.split(' ')[0];
+                        if (!articles.includes(article) || word.split(' ').length < 2) {
+                            alert(`Invalid word: "${word}". Use a valid article (der, die, das, Der, Die, Das) followed by a word.`);
+                            return;
+                        }
+                    }
+                }
+
+                // Store words, notes, and verbs under title
+                vocabulary[title] = { words, notes, verbs };
+                $('#title').val('');
+                $('#wordInput').val('');
+                $('#notesInput').val('');
+                $('#verbsInput').val('');
+                updateVocabList();
+            });
+
+            // Save as PDF
+            $('#savePDF').click(function() {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                let yOffset = 10;
+
+                // Add document title
+                doc.setFontSize(16);
+                doc.text('German Article Practice', 10, yOffset);
+                yOffset += 10;
+
+                // Check if vocabulary is empty
+                if (Object.keys(vocabulary).length === 0) {
+                    doc.setFontSize(12);
+                    doc.text('No vocabulary added.', 10, yOffset);
+                    doc.save('German_Vocabulary.pdf');
+                    return;
+                }
+
+                // Iterate through vocabulary
+                for (const [title, { words, notes, verbs }] of Object.entries(vocabulary)) {
+                    // Add title
+                    doc.setFontSize(14);
+                    doc.setTextColor(0, 0, 0); // Black for title
+                    doc.text(title, 10, yOffset);
+                    yOffset += 7;
+
+                    // Add words
+                    if (words.length > 0) {
+                        doc.setFontSize(12);
+                        doc.text('Words:', 10, yOffset);
+                        yOffset += 7;
+                        words.forEach(word => {
+                            const article = word.split(' ')[0].toLowerCase();
+                            let color = [0, 0, 0]; // Default black
+                            switch (article) {
+                                case 'der': color = [30, 144, 255]; break; // Blue
+                                case 'die': color = [255, 105, 180]; break; // Pink
+                                case 'das': color = [50, 205, 50]; break; // Green
+                            }
+                            doc.setTextColor(...color);
+                            doc.text(`- ${word}`, 15, yOffset);
+                            yOffset += 7;
+                        });
+                    }
+
+                    // Add notes
+                    if (notes.length > 0) {
+                        doc.setFontSize(12);
+                        doc.setTextColor(0, 0, 0); // Black for notes
+                        doc.text('Notes:', 10, yOffset);
+                        yOffset += 7;
+                        notes.forEach(note => {
+                            doc.text(`- ${note}`, 15, yOffset);
+                            yOffset += 7;
+                        });
+                    }
+
+                    // Add verbs
+                    if (verbs.length > 0) {
+                        doc.setFontSize(12);
+                        doc.setTextColor(0, 0, 0); // Black for verbs
+                        doc.text('Verbs:', 10, yOffset);
+                        yOffset += 7;
+                        verbs.forEach(verb => {
+                            doc.text(`- ${verb}`, 15, yOffset);
+                            yOffset += 7;
+                        });
+                    }
+
+                    yOffset += 5; // Extra spacing after each title
+                }
+
+                doc.save('German_Vocabulary.pdf');
+            });
+        });
+
+        function updateVocabList() {
+            const container = $('#wordContainer');
+            container.empty();
+
+            for (const [title, { words, notes, verbs }] of Object.entries(vocabulary)) {
+                const titleDiv = $('<div>').addClass('mb-4');
+                titleDiv.append(`<h3 class="text-md font-medium">${title}</h3>`);
+                
+                // Words
+                if (words.length > 0) {
+                    const wordList = $('<ul>').addClass('list-disc pl-5');
+                    words.forEach(word => {
+                        const article = word.split(' ')[0].toLowerCase();
+                        const li = $('<li>').html(`<span class="${article}">${word}</span>`);
+                        wordList.append(li);
+                    });
+                    titleDiv.append('<h4 class="text-sm font-semibold mt-2">Words:</h4>');
+                    titleDiv.append(wordList);
+                }
+
+                // Notes
+                if (notes.length > 0) {
+                    const noteList = $('<ul>').addClass('list-disc pl-5');
+                    notes.forEach(note => {
+                        const li = $('<li>').text(note);
+                        noteList.append(li);
+                    });
+                    titleDiv.append('<h4 class="text-sm font-semibold mt-2">Notes:</h4>');
+                    titleDiv.append(noteList);
+                }
+
+                // Verbs
+                if (verbs.length > 0) {
+                    const verbList = $('<ul>').addClass('list-disc pl-5');
+                    verbs.forEach(verb => {
+                        const li = $('<li>').text(verb);
+                        verbList.append(li);
+                    });
+                    titleDiv.append('<h4 class="text-sm font-semibold mt-2">Verbs:</h4>');
+                    titleDiv.append(verbList);
+                }
+
+                container.append(titleDiv);
+            }
+        }
+    </script>
+</body>
+</html>
