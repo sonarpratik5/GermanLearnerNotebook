@@ -62,6 +62,19 @@
         <!-- Save as PDF Button -->
         <button id="savePDF" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Save as PDF</button>
     </div>
+    <div class="mb-6"></div>
+
+    <div class="w-full max-w-4xl bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold text-center mb-6">Random Article</h1>
+
+
+        <div id="newsContainer" class="mt-6 space-y-4"></div>
+        <!-- Save as PDF Button -->
+        <button id="fetchNewsBtn"
+            class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">Generate</button>
+
+    </div>
+
 
     <script>
         let vocabulary = {};
@@ -204,6 +217,33 @@
 
                 doc.save('German_Vocabulary.pdf');
             });
+        });
+
+        document.getElementById("fetchNewsBtn").addEventListener("click", async () => {
+            const container = document.getElementById("newsContainer");
+            container.innerHTML = '<p class="text-gray-500">Lade Nachrichten...</p>';
+
+            try {
+                const res = await fetch("https://api.mediastack.com/v1/news?access_key=da15d9cc160962bc6f00e00f8fc493cf&countries=de&language=de");
+                const data = await res.json();
+
+                if (data && data.data && data.data.length > 0) {
+                    container.innerHTML = data.data.map(article => `
+          <div class="p-4 border rounded-lg bg-white shadow hover:shadow-md transition">
+            <h2 class="text-lg font-semibold text-blue-800">${article.title}</h2>
+            <p class="text-gray-700 mt-1">${article.description || 'Keine Beschreibung verfügbar.'}</p>
+            <a href="${article.url}" target="_blank" class="text-blue-600 hover:underline mt-2 inline-block">Weiterlesen</a>
+            <p class="text-sm text-gray-500 mt-1">${new Date(article.published_at).toLocaleString('de-DE')}</p>
+          </div>
+        `).join("");
+                } else {
+                    container.innerHTML = '<p class="text-red-600">Keine Nachrichten gefunden.</p>';
+                }
+
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = '<p class="text-red-600">Fehler beim Laden der Nachrichten.</p>';
+            }
         });
 
         function updateVocabList() {
