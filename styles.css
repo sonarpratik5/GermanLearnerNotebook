@@ -1,0 +1,37 @@
+.der {
+    color: #000000;
+}
+
+/* Black for der/Der */
+.die {
+    color: #ff0000;
+}
+
+/* Red for die/Die */
+.das {
+    color: #0000ff;
+}
+
+/* Blue for das/Das */
+#wordInput,
+#notesInput,
+#verbsInput {
+    font-family: monospace;
+}
+
+.output-word,
+.output-note,
+.output-verb {
+    margin-bottom: 0.5rem;
+}
+
+/* Set fixed heights for textareas */
+#wordInput {
+    height: 260px;
+    /* Matches combined height of notes and verbs + margins */
+}
+
+#notesInput,
+#verbsInput {
+    height: 120px;
+}
